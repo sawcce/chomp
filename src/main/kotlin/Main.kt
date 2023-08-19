@@ -10,9 +10,20 @@ abstract class Parser<T> {
     }
 }
 
-class ParseError(parser: Class<Any>, message: String) : Exception("($parser) $message")
+abstract class ParseError {
+    abstract override fun toString(): String
+    fun<T> toResult(remaining: String): ParserResult<T> {
+        return ParserResult(remaining, null, listOf(this))
+    }
+}
 
-data class ParserResult<T>(val result: T, val remaining: String)
+class JustError(private val expected: String, private val got: String): ParseError() {
+    override fun toString(): String {
+        return "Expected: \"$expected\" got: \"$got\""
+    }
+}
+
+data class ParserResult<T>(val remaining: String, val result: T?, val errors: List<ParseError> = listOf())
 
 class Just(private val just: String) : Parser<String>() {
     override fun parse(input: String): ParserResult<String> {
@@ -20,7 +31,7 @@ class Just(private val just: String) : Parser<String>() {
             return ParserResult(just, input.substring(just.length..<input.length))
         } else {
             val diff = input.substring(just.indices)
-            throw ParseError(Just::class.java as Class<Any>, "Couldn't parse: \"$just\", got: \"$diff\"!")
+            return JustError(just, diff).toResult(input)
         }
     }
 }
@@ -28,9 +39,12 @@ class Just(private val just: String) : Parser<String>() {
 class Then<L, R>(private val left: Parser<L>, private val right: Parser<R>) : Parser<Pair<L, R>>() {
     override fun parse(input: String): ParserResult<Pair<L, R>> {
         val leftResult = left.parse(input)
-        val rightResult = right.parse(leftResult.remaining)
+        if(leftResult.errors.isNotEmpty()) return ParserResult(input, null, leftResult.errors)
 
-        return ParserResult(Pair(leftResult.result, rightResult.result), rightResult.remaining)
+        val rightResult = right.parse(leftResult.remaining)
+        if(rightResult.errors.isNotEmpty()) return ParserResult(input, null, rightResult.errors)
+
+        return ParserResult(rightResult.remaining, Pair(leftResult.result as L, rightResult.result as R))
     }
 }
 
@@ -40,7 +54,7 @@ class Padded<T>(private val parser: Parser<T>) : Parser<T>() {
         val result = parser.parse(trimmedStart)
         val trimmedEnd = result.remaining.trimStart()
 
-        return ParserResult(result.result, trimmedEnd)
+        return ParserResult(trimmedEnd, result.result)
     }
 }
 
