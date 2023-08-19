@@ -10,7 +10,7 @@ abstract class Parser<T> {
     }
 }
 
-class ParseError(private val parser: Class<Any>, private val _message: String) : Exception("($parser) $_message")
+class ParseError(parser: Class<Any>, message: String) : Exception("($parser) $message")
 
 data class ParserResult<T>(val result: T, val remaining: String)
 
@@ -44,7 +44,7 @@ class Padded<T>(private val parser: Parser<T>) : Parser<T>() {
     }
 }
 
-fun main(args: Array<String>) {
+fun main() {
     val text = "Hello,   world!  "
     val result = Just("Hello, ").then(Just("world!").padded()).parse(text)
     println("Result: $result")
