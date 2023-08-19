@@ -4,6 +4,10 @@ abstract class Parser<T> {
     fun <R> then(right: Parser<R>): Then<T, R> {
         return Then(this, right)
     }
+
+    fun padded(): Padded<T> {
+        return Padded(this)
+    }
 }
 
 class ParseError(private val parser: Class<Any>, private val _message: String) : Exception("($parser) $_message")
@@ -30,8 +34,18 @@ class Then<L, R>(private val left: Parser<L>, private val right: Parser<R>) : Pa
     }
 }
 
+class Padded<T>(private val parser: Parser<T>) : Parser<T>() {
+    override fun parse(input: String): ParserResult<T> {
+        val trimmedStart = input.trimStart()
+        val result = parser.parse(trimmedStart)
+        val trimmedEnd = result.remaining.trimStart()
+
+        return ParserResult(result.result, trimmedEnd)
+    }
+}
+
 fun main(args: Array<String>) {
-    val text = "Hello,, world!"
-    val result = Just("Hello, ").then(Just("world!")).parse(text)
+    val text = "Hello,   world!  "
+    val result = Just("Hello, ").then(Just("world!").padded()).parse(text)
     println("Result: $result")
 }
